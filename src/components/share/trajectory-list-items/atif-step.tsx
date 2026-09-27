@@ -20,6 +20,7 @@ export interface AtifStep {
   timestamp?: string;
   source?: string;
   message?: string;
+  reasoning_content?: string;
   model_name?: string;
   tool_calls?: AtifToolCall[];
   observation?: {
@@ -29,6 +30,7 @@ export interface AtifStep {
 
 interface AtifStepProps {
   step: AtifStep;
+  turnNumber?: number;
 }
 
 const sourceStyles: Record<string, string> = {
@@ -62,12 +64,35 @@ const renderFileEditorArguments = (toolCall: AtifToolCall) => {
   );
 };
 
-export const AtifStepComponent: React.FC<AtifStepProps> = ({ step }) => {
+export const AtifStepComponent: React.FC<AtifStepProps> = ({ step, turnNumber }) => {
   const source = step.source || 'unknown';
   const toolCalls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
   const results = Array.isArray(step.observation?.results) ? step.observation.results : [];
   const message = typeof step.message === 'string' ? step.message : '';
+  const reasoning = typeof step.reasoning_content === 'string' ? step.reasoning_content : '';
   const headerSource = `${source.charAt(0).toUpperCase()}${source.slice(1)}`;
+  const matchedResults = new Set<number>();
+  const resultsForCall = (toolCall: AtifToolCall, callIndex: number) => {
+    const indexes = results.reduce<number[]>((matches, result, resultIndex) => {
+      if (toolCall.tool_call_id && result.source_call_id === toolCall.tool_call_id) matches.push(resultIndex);
+      return matches;
+    }, []);
+    // Older trajectories may omit both IDs. In that case, preserve positional pairing.
+    if (!toolCall.tool_call_id && results[callIndex] && !results[callIndex].source_call_id) indexes.push(callIndex);
+    indexes.forEach(index => matchedResults.add(index));
+    return indexes.map(index => results[index]);
+  };
+  const pairedResults = toolCalls.map(resultsForCall);
+  const unmatchedResults = results.filter((_, index) => !matchedResults.has(index));
+
+  const renderResult = (result: AtifObservationResult, index: number) => (
+    <ExpandableContent
+      key={result.source_call_id || index}
+      content={typeof result.content === 'string' ? result.content : JSON.stringify(result.content ?? '', null, 2)}
+      maxLines={10}
+      language="text"
+    />
+  );
 
   return (
     <TrajectoryCard
@@ -77,6 +102,9 @@ export const AtifStepComponent: React.FC<AtifStepProps> = ({ step }) => {
     >
       <TrajectoryCard.Header className={sourceStyles[source] || sourceStyles.agent}>
         {headerSource} step{step.step_id !== undefined ? ` #${step.step_id}` : ''}
+        {source === 'agent' && turnNumber !== undefined && (
+          <span className="ml-2 rounded bg-amber-200/70 px-1.5 py-0.5 dark:bg-amber-700/50">Agent turn {turnNumber}</span>
+        )}
         {step.model_name && <span className="ml-2 font-normal opacity-75">({step.model_name})</span>}
       </TrajectoryCard.Header>
       <TrajectoryCard.Body>
@@ -88,15 +116,22 @@ export const AtifStepComponent: React.FC<AtifStepProps> = ({ step }) => {
           </div>
         )}
 
+        {reasoning && (
+          <div className="rounded border-l-2 border-violet-400 bg-violet-50/60 p-2 dark:bg-violet-950/20">
+            <div className="mb-1 text-xs font-medium text-violet-700 dark:text-violet-300">Thinking</div>
+            <ExpandableContent content={reasoning} maxLines={10} renderContent={(content) => <CMarkdown>{content}</CMarkdown>} />
+          </div>
+        )}
+
         {toolCalls.length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              Tool calls ({toolCalls.length})
+              Tool calls in this turn ({toolCalls.length})
             </div>
             {toolCalls.map((toolCall, index) => (
               <div key={toolCall.tool_call_id || index} className="rounded border border-amber-200 dark:border-amber-800/60 overflow-hidden">
                 <div className="px-2 py-1 bg-amber-50 dark:bg-amber-900/20 text-xs font-medium text-amber-800 dark:text-amber-200">
-                  {toolCall.function_name || 'Unnamed tool'}
+                  Call {index + 1} of {toolCalls.length}: {toolCall.function_name || 'Unnamed tool'}
                 </div>
                 {toolCall.function_name === 'file_editor' ? (
                   renderFileEditorArguments(toolCall)
@@ -115,28 +150,27 @@ export const AtifStepComponent: React.FC<AtifStepProps> = ({ step }) => {
                     {JSON.stringify(toolCall.arguments, null, 2)}
                   </CSyntaxHighlighter>
                 )}
+                {pairedResults[index].length > 0 && (
+                  <div className="space-y-1 border-t border-amber-200 p-2 dark:border-amber-800/60">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Tool output</div>
+                    {pairedResults[index].map(renderResult)}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        {results.length > 0 && (
+        {unmatchedResults.length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {toolCalls.some(toolCall => toolCall.function_name === 'file_editor') ? 'File editor output' : 'Tool output'} ({results.length})
+              Unmatched tool output ({unmatchedResults.length})
             </div>
-            {results.map((result, index) => (
-              <ExpandableContent
-                key={result.source_call_id || index}
-                content={typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}
-                maxLines={10}
-                language="text"
-              />
-            ))}
+            {unmatchedResults.map(renderResult)}
           </div>
         )}
 
-        {!message && toolCalls.length === 0 && results.length === 0 && (
+        {!message && !reasoning && toolCalls.length === 0 && results.length === 0 && (
           <div className="text-sm text-gray-500 dark:text-gray-400">No content in this step.</div>
         )}
       </TrajectoryCard.Body>

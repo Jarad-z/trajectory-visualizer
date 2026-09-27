@@ -48,12 +48,55 @@ describe('TrajectoryList', () => {
     expect(screen.getAllByRole('button', { name: 'Show more' })).toHaveLength(3);
     expect(document.body.textContent).toContain('terminal');
     expect(document.body.textContent).toContain('file 1');
-    expect(screen.getByText('think')).toBeInTheDocument();
+    expect(screen.getByText('Call 1 of 1: think')).toBeInTheDocument();
     expect(screen.getByText('I should inspect the next file.')).toBeInTheDocument();
     expect(screen.getByText('Agent step #4')).toBeInTheDocument();
     expect(screen.getByText('Operation:')).toBeInTheDocument();
     expect(screen.getByText('view')).toBeInTheDocument();
     expect(screen.getByText('/app/data/README.md')).toBeInTheDocument();
     expect(screen.getByText('README contents')).toBeInTheDocument();
+  });
+
+  it('shows thinking and separates adjacent agent turns while grouping calls within a step', () => {
+    render(
+      <TrajectoryList trajectory={[
+        { step_id: 1, source: 'user', message: 'Inspect the project' },
+        {
+          step_id: 2, source: 'agent', message: '',
+          reasoning_content: '**Plan**\n\nInspect both files.',
+          tool_calls: [
+            { tool_call_id: 'a', function_name: 'view_file', arguments: { path: '/app/a' } },
+            { tool_call_id: 'b', function_name: 'view_file', arguments: { path: '/app/b' } }
+          ],
+          observation: { results: [
+            { source_call_id: 'b', content: 'output b' },
+            { source_call_id: 'a', content: 'output a' }
+          ] }
+        },
+        {
+          step_id: 3, source: 'agent', message: '',
+          reasoning_content: 'Now inspect the next file.',
+          tool_calls: [{ tool_call_id: 'c', function_name: 'view_file', arguments: { path: '/app/c' } }],
+          observation: { results: [{ source_call_id: 'c', content: 'output c' }] }
+        }
+      ] as any} />
+    );
+
+    expect(screen.getByText('Agent turn 1')).toBeInTheDocument();
+    expect(screen.getByText('Agent turn 2')).toBeInTheDocument();
+    expect(screen.getByText('Tool calls in this turn (2)')).toBeInTheDocument();
+    expect(screen.getByText('Tool calls in this turn (1)')).toBeInTheDocument();
+    expect(screen.getByText('Call 1 of 2: view_file')).toBeInTheDocument();
+    expect(screen.getByText('Call 2 of 2: view_file')).toBeInTheDocument();
+    expect(screen.getByText('Call 1 of 1: view_file')).toBeInTheDocument();
+    expect(screen.getAllByText('Thinking')).toHaveLength(2);
+    expect(screen.getByText('Inspect both files.')).toBeInTheDocument();
+    expect(screen.getByText('Now inspect the next file.')).toBeInTheDocument();
+
+    const firstCall = screen.getByText('Call 1 of 2: view_file').parentElement!;
+    const secondCall = screen.getByText('Call 2 of 2: view_file').parentElement!;
+    expect(firstCall).toHaveTextContent('output a');
+    expect(firstCall).not.toHaveTextContent('output b');
+    expect(secondCall).toHaveTextContent('output b');
   });
 });

@@ -1,0 +1,81 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "session_id": "synthetic-separate-turns",
+  "agent": {
+    "name": "synthetic-demo",
+    "version": "1.0",
+    "model_name": "demo-model"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-01-01T12:00:00Z",
+      "source": "user",
+      "message": "Read three files and summarize them."
+    },
+    {
+      "step_id": 2,
+      "timestamp": "2026-01-01T12:00:01Z",
+      "source": "agent",
+      "message": "",
+      "reasoning_content": "First I need to read a.txt.",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-a",
+          "function_name": "read_file",
+          "arguments": { "path": "/app/a.txt" }
+        }
+      ],
+      "observation": {
+        "results": [
+          { "source_call_id": "call-a", "content": "Contents of a.txt" }
+        ]
+      }
+    },
+    {
+      "step_id": 3,
+      "timestamp": "2026-01-01T12:00:02Z",
+      "source": "agent",
+      "message": "",
+      "reasoning_content": "After seeing a.txt, I will read b.txt.",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-b",
+          "function_name": "read_file",
+          "arguments": { "path": "/app/b.txt" }
+        }
+      ],
+      "observation": {
+        "results": [
+          { "source_call_id": "call-b", "content": "Contents of b.txt" }
+        ]
+      }
+    },
+    {
+      "step_id": 4,
+      "timestamp": "2026-01-01T12:00:03Z",
+      "source": "agent",
+      "message": "",
+      "reasoning_content": "After seeing b.txt, I will read c.txt.",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-c",
+          "function_name": "read_file",
+          "arguments": { "path": "/app/c.txt" }
+        }
+      ],
+      "observation": {
+        "results": [
+          { "source_call_id": "call-c", "content": "Contents of c.txt" }
+        ]
+      }
+    },
+    {
+      "step_id": 5,
+      "timestamp": "2026-01-01T12:00:04Z",
+      "source": "agent",
+      "message": "I read a.txt, b.txt, and c.txt."
+    }
+  ],
+  "final_metrics": { "total_steps": 5 }
+}

@@ -56,6 +56,12 @@ export const TrajectoryList: React.FC<TrajectoryListProps> = ({ trajectory }) =>
 
   // Apply filtering to remove unwanted events
   const filteredTrajectory = trajectory.filter(shouldDisplayItem);
+  let agentTurn = 0;
+  const numberedTrajectory = filteredTrajectory.map(item => {
+    const rawItem = item as unknown as Record<string, unknown>;
+    if (typeof rawItem.step_id === "number" && rawItem.source === "agent") agentTurn += 1;
+    return { item, turnNumber: agentTurn };
+  });
   
   return (
     <div className="flex flex-col h-full">
@@ -68,10 +74,10 @@ export const TrajectoryList: React.FC<TrajectoryListProps> = ({ trajectory }) =>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           <div className="flex flex-col gap-4">
-            {filteredTrajectory.map((item, index) => {
+            {numberedTrajectory.map(({ item, turnNumber }, index) => {
               const rawItem = item as unknown as Record<string, unknown>;
               if (typeof rawItem.step_id === "number" && typeof rawItem.source === "string") {
-                return <AtifStepComponent key={index} step={item as any} />;
+                return <AtifStepComponent key={index} step={item as any} turnNumber={turnNumber} />;
               } else if (isAgentStateChange(item)) {
                 return <AgentStateChangeComponent key={index} state={item} />;
               } else if (isUserMessage(item)) {
